@@ -1,8 +1,10 @@
 import nodemailer from 'nodemailer';
 import { Notification, DeliveryResult } from './types';
+import { NotificationChannel } from './NotificationChannel';
 import { logger } from '../shared/Logger';
 
-export class EmailSender {
+export class EmailChannel implements NotificationChannel {
+  readonly name = 'email';
   private transporter: nodemailer.Transporter;
 
   constructor() {
@@ -18,31 +20,46 @@ export class EmailSender {
   }
 
   async send(notification: Notification, recipientEmail: string): Promise<DeliveryResult> {
-    try {
-      await this.transporter.sendMail({
-        from: 'notifications@pylon.internal',
-        to: recipientEmail,
-        subject: `Notification: ${notification.eventType}`,
-        html: this.buildEmailBody(notification)
-      });
+    let attempts = 0;
 
-      logger.info('Email sent successfully', { notificationId: notification.id });
+    while (attempts < 3) {
+      try {
+        await this.transporter.sendMail({
+          from: 'notifications@pylon.internal',
+          to: recipientEmail,
+          subject: `Notification: ${notification.eventType}`,
+          html: this.buildEmailBody(notification)
+        });
 
-      return {
-        notificationId: notification.id,
-        channel: 'email',
-        success: true,
-        deliveredAt: new Date()
-      };
-    } catch (error) {
-      logger.error('Failed to send email', { notificationId: notification.id, error });
-      return {
-        notificationId: notification.id,
-        channel: 'email',
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+        logger.info('Email sent successfully', { notificationId: notification.id });
+
+        return {
+          notificationId: notification.id,
+          channel: this.name,
+          success: true,
+          deliveredAt: new Date()
+        };
+      } catch (error) {
+        attempts++;
+        logger.warn('Email send attempt failed', {
+          notificationId: notification.id,
+          attempt: attempts,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+
+        if (attempts < 3) {
+          await this.delay(1000 * attempts);
+        }
+      }
     }
+
+    logger.error('Email delivery failed after retries', { notificationId: notification.id });
+    return {
+      notificationId: notification.id,
+      channel: this.name,
+      success: false,
+      error: 'Max retries exceeded'
+    };
   }
 
   private buildEmailBody(notification: Notification): string {
@@ -51,5 +68,9 @@ export class EmailSender {
       <p>You have a new notification.</p>
       <pre>${JSON.stringify(notification.payload, null, 2)}</pre>
     `;
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
