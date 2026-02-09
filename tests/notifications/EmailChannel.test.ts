@@ -1,4 +1,4 @@
-import { EmailSender } from '../../src/notifications/EmailChannel';
+import { EmailChannel } from '../../src/notifications/EmailChannel';
 import { Notification } from '../../src/notifications/types';
 
 jest.mock('nodemailer', () => ({
@@ -7,11 +7,16 @@ jest.mock('nodemailer', () => ({
   })
 }));
 
-describe('EmailSender', () => {
-  let sender: EmailSender;
+describe('EmailChannel', () => {
+  let channel: EmailChannel;
 
   beforeEach(() => {
-    sender = new EmailSender();
+    channel = new EmailChannel();
+  });
+
+  it('should implement NotificationChannel interface', () => {
+    expect(channel.name).toBe('email');
+    expect(typeof channel.send).toBe('function');
   });
 
   it('should send email successfully', async () => {
@@ -23,9 +28,32 @@ describe('EmailSender', () => {
       createdAt: new Date()
     };
 
-    const result = await sender.send(notification, 'test@example.com');
+    const result = await channel.send(notification, 'test@example.com');
 
     expect(result.success).toBe(true);
     expect(result.channel).toBe('email');
+    expect(result.notificationId).toBe('notif-1');
+  });
+
+  it('should retry on failure', async () => {
+    const nodemailer = require('nodemailer');
+    const mockSendMail = nodemailer.createTransport().sendMail;
+
+    mockSendMail
+      .mockRejectedValueOnce(new Error('Connection timeout'))
+      .mockResolvedValueOnce({ messageId: 'test-456' });
+
+    const notification: Notification = {
+      id: 'notif-2',
+      userId: 'user-1',
+      eventType: 'order.completed',
+      payload: {},
+      createdAt: new Date()
+    };
+
+    const result = await channel.send(notification, 'test@example.com');
+
+    expect(result.success).toBe(true);
+    expect(mockSendMail).toHaveBeenCalledTimes(2);
   });
 });
