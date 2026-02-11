@@ -21,4 +21,9 @@ export class UserService {
     };
     this.preferences.set(userId, { ...existing, ...prefs });
   }
+
+  registerUser(userId: string, email: string, preferences: UserPreferences): void {
+    this.emails.set(userId, email);
+    this.preferences.set(userId, preferences);
+  }
 }
