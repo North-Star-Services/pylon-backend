@@ -1,5 +1,5 @@
 import { Notification, DeliveryResult, UserPreferences } from './types';
-import { EmailSender } from './EmailSender';
+import { EmailSender } from './EmailChannel';
 import { logger } from '../shared/Logger';
 
 export class NotificationDispatcher {

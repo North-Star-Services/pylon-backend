@@ -1,4 +1,4 @@
-import { EmailSender } from '../../src/notifications/EmailSender';
+import { EmailSender } from '../../src/notifications/EmailChannel';
 import { Notification } from '../../src/notifications/types';
 
 jest.mock('nodemailer', () => ({
